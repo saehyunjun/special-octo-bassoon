@@ -30,7 +30,11 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Check class listing
-        run: python check_classes.py
+        run: |
+          python check_classes.py
+          echo "::group::Page text (first 150 lines of each source)"
+          awk '/^===== /{n=0} n++<150' page_text.txt | cut -c1-400
+          echo "::endgroup::"
 
       - name: Save page text for debugging
         if: always()

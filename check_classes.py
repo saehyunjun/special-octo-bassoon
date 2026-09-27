@@ -89,6 +89,7 @@ def main():
             text, items = fn()
             texts.append(f"===== {name} =====\n{text}")
             candidates += [(name, i) for i in items]
+            print(f"{name}: {len(text)} chars of page text, {len(items)} candidate rows")
         except Exception as e:  # noqa: BLE001
             errors.append(f"{name}: {e!r}")
             print(f"WARN {name} failed: {e!r}", file=sys.stderr)
@@ -103,6 +104,12 @@ def main():
     matches = sorted({i for _, i in candidates if is_match(i)})
     with open("matches.json", "w") as f:
         json.dump(matches, f, indent=2)
+    # Rows that match some but not all rules. Shows what the page calls things.
+    near = [(n, i) for n, i in candidates
+            if sum(bool(p.search(i)) for p in (LEVEL, DAY, TIME, LOCATION)) >= 2]
+    print(f"Near matches (2+ of 4 rules): {len(near)}")
+    for n, i in near[:40]:
+        print(f"  [{n}] {i[:300]}")
     print(f"Checked {len(candidates)} candidate rows. Matches: {len(matches)}")
     for m in matches:
         print(" -", m)
