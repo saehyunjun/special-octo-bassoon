@@ -1,6 +1,6 @@
 # Jackrabbit class monitor
 
-A GitHub Actions workflow checks Jackrabbit org 531495 every hour, at 17 minutes past.
+A GitHub Actions workflow checks Jackrabbit org 531495 every 15 minutes, at 2, 17, 32 and 47 minutes past the hour.
 It alerts when a class matching all of these has at least one open spot:
 
 - Location code `SF` (San Francisco)
