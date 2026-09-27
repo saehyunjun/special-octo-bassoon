@@ -42,7 +42,9 @@ def is_target(c):
 
 
 def describe(c):
-    link = html.unescape(c.get("online_reg_link") or "")
+    # Full classes come with an empty link, so build one from the class ID.
+    link = html.unescape(c.get("online_reg_link") or "") or (
+        f"https://app.jackrabbitclass.com/reg.asp?id={ORG_ID}&preLoadClassID={c.get('id')}&loc={LOCATION}")
     return (f"{c.get('name')} | {c.get('start_time')}-{c.get('end_time')} | "
             f"{c.get('location_name')} | openings {openings(c)} | "
             f"instructor {', '.join(c.get('instructors') or [])} | class ID {c.get('id')} | register: {link}")
