@@ -1,9 +1,10 @@
-"""Check Jackrabbit for a Friday 6:45 PM Level 1 class at the San Francisco (SF) location.
+"""Check Jackrabbit for an open spot in a Friday 6:45 PM Level 1 class at San Francisco (SF).
 
-The parent portal class page needs a login, so this reads Jackrabbit's public
-openings feed for the same org. That feed lists the same classes as a table.
+Reads Jackrabbit's public JSON class feed for the org. showClosed=1 makes the
+feed include full classes too, so the log shows whether the target class
+exists and is full, or does not exist at all.
 
-Writes matches to matches.json. Exits 1 if the feed can't be read or parsed.
+Writes classes with open spots to matches.json. Exits 1 if the feed can't be read.
 """
 import html
 import json
@@ -12,67 +13,59 @@ import sys
 import urllib.request
 
 ORG_ID = "531495"
-FEED_URL = f"https://app.jackrabbitclass.com/jr3.0/Openings/OpeningsJS?OrgID={ORG_ID}&showcols=Location"
-
 LOCATION = "SF"
-DAY = re.compile(r"\bFri", re.I)
-TIME = re.compile(r"^0?6:45\s*pm", re.I)
+FEED_URL = (f"https://app.jackrabbitclass.com/jr3.0/Openings/OpeningsJson"
+            f"?OrgID={ORG_ID}&Loc={LOCATION}&showClosed=1")
+
+DAY = "fri"
+START = "18:45"
 LEVEL = re.compile(r"\bLevel\s*1(?!\d)", re.I)
 
-CELL = re.compile(r'<t[hd][^>]*data-title="([^"]+)"[^>]*>(.*?)</t[hd]>', re.S)
 
-
-def clean(text):
-    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", text))).strip()
-
-
-def fetch_rows():
+def fetch_classes():
     req = urllib.request.Request(FEED_URL, headers={"User-Agent": "Mozilla/5.0"})
-    body = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "replace")
-    # The feed is JavaScript that writes HTML, so quotes arrive escaped.
-    body = body.replace('\\"', '"').replace("\\'", "'").replace("\\/", "/")
-    rows = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", body, re.S):
-        cells = {k: clean(v) for k, v in CELL.findall(tr)}
-        if "Class" in cells and "Days" in cells:
-            rows.append(cells)
-    return rows
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.load(resp)["rows"]
 
 
-def is_match(row):
+def openings(c):
+    return int((c.get("openings") or {}).get("calculated_openings") or 0)
+
+
+def is_target(c):
     return (
-        row.get("Location", "").upper() == LOCATION
-        and DAY.search(row.get("Days", ""))
-        and TIME.search(row.get("Times", ""))
-        and LEVEL.search(row.get("Class", ""))
+        c.get("location_code") == LOCATION
+        and (c.get("meeting_days") or {}).get(DAY)
+        and c.get("start_time") == START
+        and LEVEL.search(f"{c.get('category1', '')} {c.get('name', '')}")
     )
 
 
-def describe(row):
-    return (f"{row.get('Class')} | {row.get('Days')} {row.get('Times')} | "
-            f"Location {row.get('Location')} | Openings {row.get('Openings')} | "
-            f"Starts {row.get('Class Starts')} | Tuition {row.get('Tuition')}")
+def describe(c):
+    link = html.unescape(c.get("online_reg_link") or "")
+    return (f"{c.get('name')} | {c.get('start_time')}-{c.get('end_time')} | "
+            f"{c.get('location_name')} | openings {openings(c)} | "
+            f"instructor {', '.join(c.get('instructors') or [])} | class ID {c.get('id')} | register: {link}")
 
 
 def main():
-    rows = fetch_rows()
-    if not rows or not any("Location" in r for r in rows):
-        print(f"Feed parse failed: {len(rows)} rows, location column missing. The feed format may have changed.")
+    classes = fetch_classes()
+    if not classes:
+        print("Feed returned no classes. The feed may have changed.")
         return 1
 
-    sf_friday = [r for r in rows if r.get("Location", "").upper() == LOCATION and DAY.search(r.get("Days", ""))]
-    full = sum(1 for r in rows if r.get("Openings", "").strip() in ("0", ""))
-    print(f"{len(rows)} classes in feed ({full} with 0 openings). {len(sf_friday)} are Friday classes at {LOCATION}.")
-    for r in sf_friday:
-        if re.match(r"0?[5-7]:\d\d\s*pm", r.get("Times", ""), re.I):
-            print("  evening:", describe(r))
+    full = sum(1 for c in classes if openings(c) <= 0)
+    print(f"{len(classes)} classes at {LOCATION} ({full} full).")
 
-    matches = [describe(r) for r in rows if is_match(r)]
+    targets = [c for c in classes if is_target(c)]
+    print(f"Friday {START} Level 1 classes at {LOCATION}: {len(targets)}")
+    for c in targets:
+        print("  ", describe(c))
+
+    matches = [describe(c) for c in targets if openings(c) > 0]
     with open("matches.json", "w") as f:
         json.dump(matches, f, indent=2)
-    print(f"Matches: {len(matches)}")
-    for m in matches:
-        print("  MATCH:", m)
+    print(f"With open spots: {len(matches)}")
     return 0
 
 

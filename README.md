@@ -1,19 +1,24 @@
 # Jackrabbit class monitor
 
 A GitHub Actions workflow checks Jackrabbit org 531495 every hour, at 17 minutes past.
-It alerts when a class matches all of these:
+It alerts when a class matching all of these has at least one open spot:
 
-- Location `SF` (San Francisco)
-- Days includes `Fri`
-- Start time `6:45pm`
-- Class name contains `Level 1`. This also matches the combined `Level 1/Level 2 (ages 6-10)` classes.
+- Location code `SF` (San Francisco)
+- Meets on Friday
+- Starts at 18:45 (6:45 PM)
+- Class level or name contains `Level 1`. This also matches the combined `Level 1/Level 2 (ages 6-10)` classes.
 
 ## Where the data comes from
 
 The [parent portal class page](https://app.jackrabbitclass.com/jr4.0/ParentPortal/Classes?OrgID=531495#classes)
-shows only a sign-in form to logged-out visitors. The workflow reads Jackrabbit's public openings feed instead:
-`https://app.jackrabbitclass.com/jr3.0/Openings/OpeningsJS?OrgID=531495&showcols=Location`.
-This feed lists the org's classes with their location code.
+needs a login. The workflow reads Jackrabbit's public JSON class feed instead:
+`https://app.jackrabbitclass.com/jr3.0/Openings/OpeningsJson?OrgID=531495&Loc=SF&showClosed=1`.
+
+- `Loc=SF` limits the feed to San Francisco.
+- `showClosed=1` includes full classes. Without it the feed lists only classes with open spots.
+- Each class has an `openings.calculated_openings` count and a direct registration link.
+
+Each run logs every Friday 6:45 PM Level 1 class at SF, with its opening count, so you can see whether the class exists and is full.
 
 ## Alerts
 
