@@ -20,10 +20,20 @@ def gh(*args):
 
 
 def send_email(body, test=False):
+    """Send the alert email. Returns False if sending failed."""
     host = os.environ.get("SMTP_HOST")
     if not host:
         print("SMTP_HOST not set. Skipping email.")
-        return
+        return True
+    try:
+        _send(host, body, test)
+    except Exception as e:  # noqa: BLE001
+        print(f"::error::Email failed: {e!r}")
+        return False
+    return True
+
+
+def _send(host, body, test):
     msg = EmailMessage()
     msg["Subject"] = ("[TEST] " if test else "") + TITLE
     msg["From"] = os.environ["SMTP_USERNAME"]
@@ -45,7 +55,7 @@ def main():
         body = "TEST alert from the Jackrabbit class monitor. No action needed.\n\n" + \
                "Current matches:\n" + ("\n".join(f"- {m}" for m in matches) or "(none)") + f"\n\n{URL}\n"
         if os.environ.get("SMTP_HOST"):
-            send_email(body, test=True)
+            return 0 if send_email(body, test=True) else 1
         else:
             out = gh("issue", "create", "-R", repo, "--title", "[TEST] " + TITLE,
                      "--assignee", owner, "--body", body)
@@ -64,12 +74,14 @@ def main():
         return
 
     body = "Matching class listing:\n\n" + "\n".join(f"- {m}" for m in matches) + f"\n\nSign up: {URL}\n"
-    send_email(body)
+    # Open the issue even if email fails, so the alert is not lost.
+    email_ok = send_email(body)
 
     gh("label", "create", LABEL, "-R", repo, "--force", "--color", "2ea44f")
     gh("issue", "create", "-R", repo, "--title", TITLE, "--label", LABEL,
        "--assignee", owner, "--body", body + f"\n@{owner} close this issue to re-arm the alert.")
     print("Issue created.")
+    return 0 if email_ok else 1
 
 
 if __name__ == "__main__":
