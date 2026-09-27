@@ -61,7 +61,8 @@ def main():
         return 1
 
     sf_friday = [r for r in rows if r.get("Location", "").upper() == LOCATION and DAY.search(r.get("Days", ""))]
-    print(f"{len(rows)} classes in feed. {len(sf_friday)} are Friday classes at {LOCATION}.")
+    full = sum(1 for r in rows if r.get("Openings", "").strip() in ("0", ""))
+    print(f"{len(rows)} classes in feed ({full} with 0 openings). {len(sf_friday)} are Friday classes at {LOCATION}.")
     for r in sf_friday:
         if re.match(r"0?[5-7]:\d\d\s*pm", r.get("Times", ""), re.I):
             print("  evening:", describe(r))
