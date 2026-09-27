@@ -1,30 +1,46 @@
 # Jackrabbit class monitor
 
-A GitHub Actions workflow checks the
-[class listing](https://app.jackrabbitclass.com/jr4.0/ParentPortal/Classes?OrgID=531495#classes)
-every hour. It looks for a class that mentions all of: Level 1, Friday, 6:45 (not AM), and San Francisco.
+A GitHub Actions workflow checks Jackrabbit org 531495 every hour, at 17 minutes past.
+It alerts when a class matches all of these:
 
-When it finds one, it:
+- Location `SF` (San Francisco)
+- Days includes `Fri`
+- Start time `6:45pm`
+- Class name contains `Level 1`. This also matches the combined `Level 1/Level 2 (ages 6-10)` classes.
+
+## Where the data comes from
+
+The [parent portal class page](https://app.jackrabbitclass.com/jr4.0/ParentPortal/Classes?OrgID=531495#classes)
+shows only a sign-in form to logged-out visitors. The workflow reads Jackrabbit's public openings feed instead:
+`https://app.jackrabbitclass.com/jr3.0/Openings/OpeningsJS?OrgID=531495&showcols=Location`.
+This feed lists the org's classes with their location code.
+
+## Alerts
+
+On a match the workflow:
 
 1. Sends an email, if the SMTP secrets below are set.
-2. Opens a GitHub issue labelled `class-found` and assigns it to the repo owner. GitHub emails you about it.
+2. Opens a GitHub issue labelled `class-found` and assigns it to the repo owner. GitHub emails the owner about it.
 
-It reports once. Close the issue to get alerted again.
+It alerts once. Close the issue to re-arm the alert.
 
-## Setup
+If the feed cannot be read or its format changes, the run fails. GitHub emails the owner about failed scheduled runs.
 
-Add these repository secrets (Settings > Secrets and variables > Actions):
+## Email setup
+
+Add these repository secrets under Settings > Secrets and variables > Actions:
 
 | Secret | Example |
 | --- | --- |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
-| `SMTP_USERNAME` | your Gmail address |
+| `SMTP_USERNAME` | the sending Gmail address |
 | `SMTP_PASSWORD` | a Gmail app password |
-| `MAIL_TO` | where the alert goes |
+| `MAIL_TO` | the address that gets the alert |
 
-The workflow must be on the default branch for the hourly schedule to run.
+Test it: Actions > Jackrabbit class monitor > Run workflow, tick "Send a test alert".
 
-## Debugging
+## Schedule
 
-Each run uploads `page_text.txt` (what the page showed) and `matches.json` as the `page-text` artifact.
+GitHub runs scheduled workflows only from the default branch.
+GitHub disables the schedule after 60 days with no commits to the repo. Re-enable it from the Actions tab.

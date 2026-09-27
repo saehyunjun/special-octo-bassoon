@@ -19,13 +19,13 @@ def gh(*args):
     return subprocess.run(["gh", *args], check=True, capture_output=True, text=True).stdout
 
 
-def send_email(body):
+def send_email(body, test=False):
     host = os.environ.get("SMTP_HOST")
     if not host:
         print("SMTP_HOST not set. Skipping email.")
         return
     msg = EmailMessage()
-    msg["Subject"] = TITLE
+    msg["Subject"] = ("[TEST] " if test else "") + TITLE
     msg["From"] = os.environ["SMTP_USERNAME"]
     msg["To"] = os.environ["MAIL_TO"]
     msg.set_content(body)
@@ -38,11 +38,25 @@ def send_email(body):
 
 def main():
     matches = json.load(open("matches.json"))
+    repo = os.environ["GITHUB_REPOSITORY"]
+    owner = repo.split("/")[0]
+
+    if os.environ.get("TEST_ALERT") == "true":
+        body = "TEST alert from the Jackrabbit class monitor. No action needed.\n\n" + \
+               "Current matches:\n" + ("\n".join(f"- {m}" for m in matches) or "(none)") + f"\n\n{URL}\n"
+        if os.environ.get("SMTP_HOST"):
+            send_email(body, test=True)
+        else:
+            out = gh("issue", "create", "-R", repo, "--title", "[TEST] " + TITLE,
+                     "--assignee", owner, "--body", body)
+            gh("issue", "close", out.strip(), "-R", repo)
+            print(f"SMTP not set. Created and closed test issue {out.strip()}.")
+        return
+
     if not matches:
         print("No match.")
         return
 
-    repo = os.environ["GITHUB_REPOSITORY"]
     open_issues = json.loads(gh("issue", "list", "-R", repo, "--label", LABEL,
                                 "--state", "open", "--json", "number"))
     if open_issues:
@@ -52,7 +66,6 @@ def main():
     body = "Matching class listing:\n\n" + "\n".join(f"- {m}" for m in matches) + f"\n\nSign up: {URL}\n"
     send_email(body)
 
-    owner = repo.split("/")[0]
     gh("label", "create", LABEL, "-R", repo, "--force", "--color", "2ea44f")
     gh("issue", "create", "-R", repo, "--title", TITLE, "--label", LABEL,
        "--assignee", owner, "--body", body + f"\n@{owner} close this issue to re-arm the alert.")
