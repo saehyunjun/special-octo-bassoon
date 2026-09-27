@@ -1,0 +1,53 @@
+name: Jackrabbit class monitor
+
+on:
+  schedule:
+    - cron: "17 * * * *" # every hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: class-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+
+      - name: Check class listing
+        run: python check_classes.py
+
+      - name: Save page text for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-text
+          path: |
+            page_text.txt
+            matches.json
+          retention-days: 3
+
+      - name: Notify on match
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python notify.py
